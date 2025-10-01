@@ -1,0 +1,22 @@
+*
+
+!.gitignore
+
+# Documentation
+!README.md
+
+# Source code
+!*.cue
+!cue.mod/
+!cue.mod/*.cue
+!schemas/
+!schemas/*.cue
+!workloads/
+!workloads/*.cue
+!backends/
+!backends/*.cue
+
+
+# Devcontainer environment
+!.devcontainer/
+!.devcontainer/devcontainer.json
