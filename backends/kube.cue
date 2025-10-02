@@ -6,13 +6,44 @@ import (
 	appsv1 "cue.dev/x/k8s.io/api/apps/v1@v0"
 	corev1 "cue.dev/x/k8s.io/api/core/v1@v0"
 	"github.com/bcachet/cuefig/workloads"
+	"github.com/bcachet/cuefig/schemas"
 )
+
+// Vault configuration (can be overridden)
+vaultConfig: {
+	server:  string | *"https://vault.default.svc.cluster.local:8200"
+	path:    string | *"secret"
+	version: string | *"v2"
+	auth: {
+		kubernetes: {
+			mountPath: string | *"kubernetes"
+			role:      string | *"default"
+		}
+	}
+}
 
 manifests: {
 	kind: "List"
 	apiVersion: "v1"
 	items: [
-	for k, deployment in workloads.workloads if len(deployment["configs"]) > 0 {
+		// Generate SecretStore for Vault backend
+		schemas.#SecretStore & {
+			metadata: {
+				name: "vault-backend"
+			}
+			spec: {
+				provider: {
+					vault: {
+						server:  vaultConfig.server
+						path:    vaultConfig.path
+						version: vaultConfig.version
+						auth:    vaultConfig.auth
+					}
+				}
+			}
+		},
+
+		for k, deployment in workloads.workloads if len(deployment["configs"]) > 0 {
 		for kc, config in deployment.configs {
 			corev1.#ConfigMap & {
 				metadata: name: "\(k)-\(kc)"
@@ -25,15 +56,27 @@ manifests: {
 
 	for k, deployment in workloads.workloads if len(deployment["secrets"]) > 0 {
 		for ks, secret in deployment.secrets {
-			corev1.#Secret & {
-				metadata: name: "\(k)-\(ks)"
-				stringData: {
-					if secret.type == "file" {
-						"\(path.Base(secret.mount, path.Unix))": secret.name
+			schemas.#ExternalSecret & {
+				metadata: {
+					name: "\(k)-\(ks)"
+				}
+				spec: {
+					secretStoreRef: {
+						name: "vault-backend"
+						kind: "SecretStore"
 					}
-					if secret.type == "env" {
-						"\(secret.name)": secret.name
+					refreshInterval: "1h"
+					target: {
+						name:           "\(k)-\(ks)"
 					}
+					data: [
+						{
+							secretKey: "data"
+							remoteRef: {
+								key: secret.name
+							}
+						}
+					]
 				}
 			}
 		}

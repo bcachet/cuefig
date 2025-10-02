@@ -15,7 +15,7 @@ workloads: schemas.#Workloads & {
 			name:     "redis"
 		}
 		secrets: creds: schemas.#SecretFile & {
-			name:   "REDIS_PASSWORD"
+			name:   "redis/password"
 			mount:  "/run/secrets/redis_password"
 		}
 		configs: {
