@@ -14,6 +14,9 @@ workloads: schemas.#Workloads & {
 			registry: "docker.io"
 			name:     "redis"
 		}
+		secrets: creds: schemas.#SecretEnv & {
+			name:   "REDIS_PASSWORD"
+			}
 		configs: {
 			config: {
 				mount: "/etc/redis/redis.json"

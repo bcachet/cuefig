@@ -6,7 +6,7 @@ package schemas
 {
 	name!:     string
 	engine:    string | *"kv"
-	type!:     *"env" | "file"
+	type!:     "env" | "file"
 	template?: string
 }
 
