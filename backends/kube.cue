@@ -73,7 +73,7 @@ manifests: {
 						{
 							secretKey: "data"
 							remoteRef: {
-								key: secret.name
+								key: secret.path
 							}
 						}
 					]

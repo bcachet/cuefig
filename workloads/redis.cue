@@ -8,14 +8,14 @@ import (
 workloads: schemas.#Workloads & {
 	redis: schemas.#Workload & {
 		expose: {
-			ports: service: {containerPort: 6379}
+			ports: "6379": {}
 		}
 		container: {
 			registry: "docker.io"
 			name:     "redis"
 		}
 		secrets: creds: schemas.#SecretFile & {
-			name:   "redis/password"
+		  path:   "redis/password"
 			mount:  "/run/secrets/redis_password"
 		}
 		configs: {

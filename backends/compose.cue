@@ -8,7 +8,7 @@ import (
 )
 
 composefile: compose.#Schema & {
-	services: { 
+	services: {
 		for k, deployment in workloads.workloads {
 			"\(k)": {
 				image: "\(deployment.container.registry)/\(deployment.container.name):\(deployment.container.tag)"

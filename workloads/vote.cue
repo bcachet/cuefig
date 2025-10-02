@@ -7,7 +7,7 @@ import (
 workloads: schemas.#Workloads & {
     vote: schemas.#Workload & {
         expose: {
-            ports: service: {containerPort: 5000}
+            ports: "5000": {}
         }
         container: {
             registry: "docker.io"

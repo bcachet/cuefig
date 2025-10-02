@@ -1,8 +1,14 @@
 package schemas
 
-// Define how workload is exposed
+import (
+  "strconv"
+)
+
+// Define how a Workload is exposed to others
 #Expose: {
-	ports!: [string]: #Port
+	ports!: [Port=string]: #Port & {
+	  containerPort: strconv.Atoi(Port)
+	}
 	certs?: [string]: #Certificate
 }
 

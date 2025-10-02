@@ -8,7 +8,7 @@ import (
 // Define Vault secret to be mounted (file)/injected (env var) into the workload
 #Secret:
 {
-	name!:     string
+	path!:     string
 	engine:    string | *"kv"
 	type!:     "env" | "file"
 	template?: string
@@ -26,7 +26,7 @@ import (
 	type: "file"
 }
 
-// Our secrets are stored in Vault and retrieved 
+// Our secrets are stored in Vault and retrieved
 // via [_External Secrets Operator_](external-secrets.io)
 // We are specifying shape of associated CRDs
 

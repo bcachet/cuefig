@@ -7,6 +7,7 @@ package schemas
 	configs: [string]: #Config
 	secrets: [string]: #Secret
 	volumes: [string]: #Volume
+	envs:    [string]: string
 	deps: [...#Workload]
 }
 
