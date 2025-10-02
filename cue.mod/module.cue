@@ -1,4 +1,4 @@
-module: "org.cuefig/cuefig"
+module: "github.com/bcachet/cuefig"
 language: {
 	version: "v0.14.1"
 }
