@@ -23,6 +23,22 @@ manifests: {
 		}
 	},
 
+	for k, deployment in workloads.workloads if len(deployment["secrets"]) > 0 {
+		for ks, secret in deployment.secrets {
+			corev1.#Secret & {
+				metadata: name: "\(k)-\(ks)"
+				stringData: {
+					if secret.type == "file" {
+						"\(path.Base(secret.mount, path.Unix))": secret.name
+					}
+					if secret.type == "env" {
+						"\(secret.name)": secret.name
+					}
+				}
+			}
+		}
+	},
+
 	for k, deployment in workloads.workloads {
 		appsv1.#Deployment & {
 			metadata: {
@@ -49,16 +65,19 @@ manifests: {
 										name:      "\(k)-\(kc)"
 										mountPath: path.Dir(config.mount)
 									}]
+								},
+								if len(deployment.secrets) > 0 {
+									[for ks, secret in deployment.secrets if secret.type == "file" {
+										name:      "\(k)-\(ks)"
+										mountPath: path.Dir(secret.mount)
+									}]
 								}])
 							ports: [for port in deployment.expose.ports {
 								containerPort: port.containerPort
 							}]
-							// for kp, probe in deployment.probes {
-							// 	"\(kp)Probe": probe
-							// }
-							// envFrom: [for ks, secret in deployment.secrets if secret.type == "env" {
-							// 	secretRef: name: "\(k)-\(ks)"
-							// }]
+							envFrom: [for ks, secret in deployment.secrets if secret.type == "env" {
+								secretRef: name: "\(k)-\(ks)"
+							}]
 						}]
 						volumes: list.Concat([
 							[for kv, volume in deployment.volumes {
@@ -80,6 +99,12 @@ manifests: {
 								name: "\(k)-\(kc)"
 								configMap: {
 									name: "\(k)-\(kc)"
+								}
+							}],
+							[for ks, secret in deployment.secrets if secret.type == "file" {
+								name: "\(k)-\(ks)"
+								secret: {
+									secretName: "\(k)-\(ks)"
 								}
 							}],
 						])

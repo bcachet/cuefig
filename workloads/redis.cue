@@ -2,7 +2,7 @@ package workloads
 
 import (
 	"encoding/json"
-	"github.com/bcachet/cuefig/schemas"
+	schemas "github.com/bcachet/cuefig/schemas:schemas"
 )
 
 workloads: schemas.#Workloads & {
@@ -14,9 +14,10 @@ workloads: schemas.#Workloads & {
 			registry: "docker.io"
 			name:     "redis"
 		}
-		secrets: creds: schemas.#SecretEnv & {
+		secrets: creds: schemas.#SecretFile & {
 			name:   "REDIS_PASSWORD"
-			}
+			mount:  "/run/secrets/redis_password"
+		}
 		configs: {
 			config: {
 				mount: "/etc/redis/redis.json"

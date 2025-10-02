@@ -1,6 +1,7 @@
 package schemas
 
 #Workload: {
+	name!:      string
 	container!: #Container
 	expose!:    #Expose
 	configs: [string]: #Config
@@ -9,4 +10,6 @@ package schemas
 	deps: [...#Workload]
 }
 
-#Workloads: [string]: #Workload
+#Workloads: [Name=string]: #Workload & {
+	name: Name
+}

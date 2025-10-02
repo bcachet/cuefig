@@ -1,7 +1,7 @@
 package workloads
 
 import (
-    "github.com/bcachet/cuefig/schemas"
+    schemas "github.com/bcachet/cuefig/schemas:schemas"
 )
 
 workloads: schemas.#Workloads & {

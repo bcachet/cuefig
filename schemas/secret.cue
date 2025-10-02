@@ -8,6 +8,10 @@ package schemas
 	engine:    string | *"kv"
 	type!:     "env" | "file"
 	template?: string
+	if type == "file" {
+		mount?:  string
+		mode?:   int | *0o400
+	}
 }
 
 #SecretEnv: #Secret & {
@@ -16,6 +20,4 @@ package schemas
 
 #SecretFile: #Secret & {
 	type: "file"
-	mount!: string
-	mode?:  int | *0o400
 }
