@@ -13,14 +13,23 @@ import (
 }
 
 #Port: {
-	protocol:       *"tcp" | "udp" | "grpc" | "http" | "https"
+	// Port the application listens on inside the container
 	containerPort!: int
-	exposedPort?:   int | *containerPort
+
+	// External port to expose (defaults to containerPort if not specified)
+	exposedPort?: int
 }
 
 #Certificate: {
-	pki?:  string
-	ca?:   string
-	cert?: string
-	key?:  string
+	// Vault PKI mount path (e.g., "pki" or "pki_int")
+	pki: string | *"pki"
+
+	// Common Name for the certificate
+	commonName: string
+
+	// Subject Alternative Names (SANs)
+	altNames?: [...string]
+
+	// Certificate TTL (e.g., "720h", "30d")
+	ttl?: string
 }

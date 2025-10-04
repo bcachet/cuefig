@@ -156,5 +156,27 @@ manifests: {
 			}
 		}
 	},
+
+	// Generate LoadBalancer Services for workloads with exposed ports
+	for k, deployment in workloads.workloads if len(deployment.expose.ports) > 0 {
+		corev1.#Service & {
+			metadata: {
+				name: k
+				labels: app: k
+			}
+			spec: {
+				type: "LoadBalancer"
+				selector: app: k
+				ports: [for portName, portDef in deployment.expose.ports {
+					let exposedPort = portDef.exposedPort | portDef.containerPort
+					{
+						name:       portName
+						port:       exposedPort
+						targetPort: portDef.containerPort
+					}
+				}]
+			}
+		}
+	},
 ]
 }

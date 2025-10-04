@@ -13,11 +13,11 @@ composefile: compose.#Schema & {
 			"\(k)": {
 				image: "\(deployment.container.registry)/\(deployment.container.name):\(deployment.container.tag)"
 				ports: [for port in deployment.expose.ports {
-					if port["exposedPort"] != _|_ {
-						"\(port.containerPort):\(port.exposedPort)"
+					if port.exposedPort != _|_ {
+						"\(port.exposedPort):\(port.containerPort)"
 					}
-					if port["exposedPort"] == _|_ {
-						port.containerPort
+					if port.exposedPort == _|_ {
+						"\(port.containerPort)"
 					}
 				}]
 				volumes: list.Concat([
@@ -40,10 +40,6 @@ composefile: compose.#Schema & {
                 depends_on: [for kw, workload in workloads.workloads if list.Contains(deployment.deps, workload) {
                     kw
                 }]
-				// expose:
-				// 	[for port in deployment.expose.ports if port["exposedPort"] == _|_ {
-				// 		port.exposedPort
-				// 	}]
 			}
 		}
 	}
