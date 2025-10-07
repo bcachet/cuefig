@@ -8,6 +8,10 @@ package schemas
 	// Probe mechanism type
 	type!: "http" | "tcp" | "grpc" | "exec"
 
+	if type != "exec" {
+		port: int
+	}
+
 	// HTTP/HTTPS probe configuration
 	if type == "http" {
 		path!:   string

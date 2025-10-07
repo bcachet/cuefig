@@ -11,30 +11,28 @@ workloads: schemas.#Workloads & {
 			registry: "docker.io"
 			name:     "redis"
 		}
+
+		expose: ports: "6379": {}
+
 		secrets: creds: schemas.#SecretFile & {
 			path:   "redis/password"
 		  	mount:  "/run/secrets/redis_password"
 		}
-		configs: {
-			config: {
-				mount: "/etc/redis/redis.json"
-				data: json.Marshal(
-					{
-						foo: "bar"
-					})
-			}
+
+		configs: config: {
+			mount: "/etc/redis/redis.json"
+			data: json.Marshal(
+				{
+					foo: "bar"
+				})
 		}
-		volumes: {
-			data: schemas.#VolumeDir & {
+
+		volumes: data: schemas.#VolumeDir & {
 				mount: "/data"
 			}
-		}
-		expose: {
-			ports: "6379": {
-				probes: liveness: schemas.#ProbeHttp & {
-					path: "/healthz"
-				}
-			}
+
+		probes: liveness: schemas.#ProbeTcp & {
+			port: 6379
 		}
 	}
 }

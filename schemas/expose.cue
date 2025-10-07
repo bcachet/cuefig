@@ -18,10 +18,6 @@ import (
 
 	// External port to expose (defaults to containerPort if not specified)
 	exposedPort?: int
-
-	// Optional health check probes for this port
-	// Keys must be one of: "liveness", "readiness", "startup"
-	probes?: [#ProbeType]: #Probe
 }
 
 #Certificate: {

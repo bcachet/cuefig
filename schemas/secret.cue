@@ -13,7 +13,7 @@ import (
 	type!:     "env" | "file"
 	template?: string
 	if type == "file" {
-		mount?:  string
+		mount!:  string
 		mode?:   int | *0o400
 	}
 }
