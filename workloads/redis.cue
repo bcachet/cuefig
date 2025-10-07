@@ -7,20 +7,13 @@ import (
 
 workloads: schemas.#Workloads & {
 	redis: schemas.#Workload & {
-		expose: {
-			ports: "6379": {
-				probes: liveness: schemas.#ProbeHttp & {
-					path: "/healthz"
-				}
-			}
-		}
 		container: {
 			registry: "docker.io"
 			name:     "redis"
 		}
 		secrets: creds: schemas.#SecretFile & {
-		  path:   "redis/password"
-			mount:  "/run/secrets/redis_password"
+			path:   "redis/password"
+		  	mount:  "/run/secrets/redis_password"
 		}
 		configs: {
 			config: {
@@ -29,6 +22,18 @@ workloads: schemas.#Workloads & {
 					{
 						foo: "bar"
 					})
+			}
+		}
+		volumes: {
+			data: schemas.#VolumeDir & {
+				mount: "/data"
+			}
+		}
+		expose: {
+			ports: "6379": {
+				probes: liveness: schemas.#ProbeHttp & {
+					path: "/healthz"
+				}
 			}
 		}
 	}
