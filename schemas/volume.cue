@@ -2,7 +2,10 @@ package schemas
 
 #Volume: {
     mount!: string
-    type!: *"emptyDir" | "hostPath"
+    type!: "emptyDir" | "hostPath"
+    if type == "hostPath" {
+        source!: string
+    }
 }
 
 #VolumeDir: #Volume & {
@@ -11,5 +14,5 @@ package schemas
 
 #VolumeBind: #Volume & {
     type: "hostPath"
-    source!: string
+    
 }

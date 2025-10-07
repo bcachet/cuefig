@@ -9,7 +9,7 @@ workloads: schemas.#Workloads & {
 	redis: schemas.#Workload & {
 		expose: {
 			ports: "6379": {
-				probes: liveness: {
+				probes: liveness: schemas.#ProbeHttp & {
 					path: "/healthz"
 				}
 			}
