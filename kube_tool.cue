@@ -8,6 +8,10 @@ import (
 
 command: kube: {
 	print: cli.Print & {
-		text: yaml.Marshal(backends.manifests)
+		text: yaml.Marshal({
+			kind: "List"
+			apiVersion: "v1"
+			items: [for _, manifest in backends.manifests {manifest}]
+		})
 	}
 }
