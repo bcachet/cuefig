@@ -8,7 +8,11 @@ import (
 workloads: schemas.#Workloads & {
 	redis: schemas.#Workload & {
 		expose: {
-			ports: "6379": {}
+			ports: "6379": {
+				probes: liveness: {
+					path: "/healthz"
+				}
+			}
 		}
 		container: {
 			registry: "docker.io"
