@@ -1,29 +1,31 @@
 package backends
 
 import (
-	"strings"
+	"text/template"
 	"github.com/bcachet/cuefig/workloads"
 )
 
-// Generate Mermaid state diagram showing workload dependencies
+// Generate Mermaid flowchart showing workload dependencies
 mermaid: {
-	let header = "stateDiagram-v2"
+	// Prepare data for template
+	let data = {
+		dependencies: [
+			for k, deployment in workloads.workloads
+			for dep in deployment.deps {
+				from: k
+				to:   dep.name
+			},
+		]
+	}
 
-	// Generate state definitions (workload names)
-	let states = strings.Join([for k, _ in workloads.workloads {k}], "\n    ")
+	// Template for Mermaid flowchart
+	let tmpl = """
+		flowchart TD
+		{{- range .dependencies}}
+		    {{.from}} --> {{.to}}
+		{{- end}}
+		"""
 
-	// Generate transitions (dependencies)
-	let transitions = strings.Join([
-		for k, deployment in workloads.workloads
-		for dep in deployment.deps {
-			"\(k) --> \(dep.name)"
-		}
-	], "\n    ")
-
-	// Build complete diagram
-	output: """
-	\(header)
-	    \(states)
-	    \(transitions)
-	"""
+	// Execute template
+	output: template.Execute(tmpl, data)
 }
