@@ -1,15 +1,12 @@
 # Cuefig
 
-Use [CUE](https://cuelang.org/) to define your workloads.
+Let your users define their workloads with simple [CUE](https://cuelang.org/) schemas.
 
-Hide complexity of your Kubernetes platform to your users by implementing secrets/certificates/configuration retrieval or service/health-check definition through CUE.
+Hide complexity of your deployment platform by implementing wrappers around configuration definition, secrets/certificates retrieval, monitoring ... 
 
-As a bonus we can leverage those workloads to generate docker-compose environment for local development or dependecy graph via mermaid.
+Key Features:
 
-
-### Key Features
-
-- **Single Source of Truth**: Define workloads once, deploy anywhere
+- **Single Source of Truth**: Define workloads once, deploy anywhere (thanks to dedicated backends)
 - **Type Safety**: Leverage CUE's powerful type system for validation
 - **Secret/Certificate Management**: Integrated Vault
 - **Dependency Management**: Declare workload dependencies explicitly
@@ -31,63 +28,23 @@ A workload is the fundamental unit that combines:
 
 ### Backend Generators
 
-- **Docker Compose**: Transforms workloads into `docker-compose.yaml`, writes ConfigMaps to `.generated/` directory
+- **Docker Compose**: Transforms workloads into `docker-compose.yaml`
 - **Kubernetes**: Generates Deployments, ConfigMaps, ExternalSecrets, and SecretStore manifests
 - **Mermaid**: Generates state diagrams showing workload dependencies
 
-## Getting Started
-
-### Prerequisites
-
-- [CUE](https://cuelang.org/docs/install/) v0.14.1 or later
-- Kubernetes cluster (for Kubernetes deployments)
-- Vault with KV & PKI backends (for secrets and TLS certificates)
-- Docker (for Compose deployments)
-
-### Defining a Workload
-
-Create a new file in [workloads/](workloads/) directory:
-
-```cue
-package workloads
-
-import (
-    schemas "github.com/bcachet/cuefig/schemas:schemas"
-)
-
-workloads: schemas.#Workloads & {
-    myapp: schemas.#Workload & {
-        container: {
-            registry: "docker.io"
-            name:     "myorg/myapp"
-            tag:      "latest"
-        }
-
-        expose: {
-            ports: "8080": {}
-        }
-
-        configs: appconfig: {
-            mount: "/etc/myapp/config.json"
-            data: """
-                {
-                    "setting": "value"
-                }
-                """
-        }
-
-        volumes: data: schemas.#VolumeDir & {
-            mount: "/data"
-        }
-
-        probes: liveness: schemas.#ProbeTcp & {
-            port: 8080
-        }
-    }
-}
-```
 
 ## Usage
+
+### Generate Kubernetes Manifests
+
+```bash
+cue cmd kube
+```
+
+Apply to your cluster:
+```bash
+cue cmd kube | kubectl apply -f -
+```
 
 ### Generate Docker Compose Configuration
 
@@ -104,16 +61,6 @@ Deploy with Docker Compose:
 cue cmd compose | docker compose -f - up -d
 ```
 
-### Generate Kubernetes Manifests
-
-```bash
-cue cmd kube
-```
-
-Apply to your cluster:
-```bash
-cue cmd kube | kubectl apply -f -
-```
 
 ### Generate Dependency Diagram
 
@@ -125,18 +72,14 @@ This generates a Mermaid state diagram showing workload dependencies.
 
 ### Validate Configuration
 
+Ensure data match specifications
 ```bash
 cue vet ./...
 ```
 
-### Export Evaluated Data
-
+Visualize specific manifest
 ```bash
-# Export Docker Compose backend
-cue export ./backends/compose.cue
-
-# Export Kubernetes backend
-cue export ./backends/kube.cue
+cue export ./backends/kube.cue --out yaml -e manifests.service_redis
 ```
 
 ## Configuration Guide
@@ -227,14 +170,6 @@ probes: readiness: schemas.#ProbeHttp & {
 }
 ```
 
-## Examples
-
-See the example workloads in [workloads/](workloads/):
-
-- [redis.cue](workloads/redis.cue): Redis with TLS, secrets, config files, and volumes
-- [vote.cue](workloads/vote.cue): Voting app with Redis dependency
-
-
 ## Kubernetes
 
 The Kubernetes backend behaviors:
@@ -317,3 +252,9 @@ Generated manifests follow these naming conventions:
 - `service_<workload>`: Service resources
 
 Use these keys to replace generated manifests or create new ones with custom keys.
+
+## Docker Compose
+
+Behaviors:
+- Writes ConfigMaps to `.generated/` directory to mount it in a volume
+
