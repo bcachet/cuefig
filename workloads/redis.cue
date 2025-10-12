@@ -12,7 +12,15 @@ workloads: schemas.#Workloads & {
 			name:     "redis"
 		}
 
-		expose: ports: "6379": {}
+		expose: {
+			ports: "6379": {}
+			certs: "tls": {
+				pki: "pki"
+				commonName: "redis.default.svc.cluster.local"
+				altNames: ["redis", "localhost"]
+				ttl: "720h"
+			}
+		}
 
 		secrets: creds: schemas.#SecretFile & {
 			path:   "redis/password"

@@ -3,6 +3,7 @@ package backends
 import (
 	"path"
 	"list"
+	"encoding/yaml"
 	appsv1 "cue.dev/x/k8s.io/api/apps/v1@v0"
 	corev1 "cue.dev/x/k8s.io/api/core/v1@v0"
 	"github.com/bcachet/cuefig/workloads"
@@ -22,25 +23,19 @@ vaultConfig: {
 	}
 }
 
-manifests: {
-	
-	// Generate SecretStore for Vault backend
-	"secret-store": schemas.#SecretStore & {
-		metadata: {
-			name: "vault-backend"
-		}
-		spec: {
-			provider: {
-				vault: {
-					server:  vaultConfig.server
-					path:    vaultConfig.path
-					version: vaultConfig.version
-					auth:    vaultConfig.auth
-				}
-			}
-		}
-	},
+// Helper to check if workload has dependencies with certs
+_workloadHasDepsWithCerts: {
+	for k, deployment in workloads.workloads {
+		"\(k)": len([for dep in deployment.deps
+			if dep.expose.certs != _|_ && len(dep.expose.certs) > 0 {
+				true
+			}]) > 0
+	}
+}
 
+manifests: {
+
+	// Generate ConfigMaps for workload configs
 	for k, deployment in workloads.workloads if len(deployment["configs"]) > 0 {
 		for kc, config in deployment.configs {
 			"config-map_\(k)_\(kc)": corev1.#ConfigMap & {
@@ -52,33 +47,61 @@ manifests: {
 		}
 	},
 
-for k, deployment in workloads.workloads if len(deployment["secrets"]) > 0 {
-	for ks, secret in deployment.secrets {
-		"external-secret_\(k)_\(ks)": schemas.#ExternalSecret & {
-			metadata: {
-				name: "\(k)-\(ks)"
-			}
-			spec: {
-				secretStoreRef: {
-					name: "vault-backend"
-					kind: "SecretStore"
-				}
-				refreshInterval: "1h"
-				target: {
-					name:           "\(k)-\(ks)"
-				}
-				data: [
-					{
-						secretKey: "data"
-						remoteRef: {
-							key: secret.path
-						}
+	// Generate SecretProviderClass for workload secrets and dependency CA certificates
+	for k, deployment in workloads.workloads {
+		let hasSecrets = len(deployment.secrets) > 0
+		let hasDepsWithCerts = _workloadHasDepsWithCerts[k]
+
+		if hasSecrets || hasDepsWithCerts {
+			"secret-provider-class_\(k)": schemas.#SecretProviderClass & {
+				metadata: name: "\(k)-secrets"
+				spec: {
+					provider: "vault"
+					parameters: {
+						vaultAddress: vaultConfig.server
+						roleName: vaultConfig.auth.kubernetes.role
+						vaultKubernetesMountPath: vaultConfig.auth.kubernetes.mountPath
+
+						// Build objects array for secrets and CA certs
+						let secretObjects = [
+							for ks, secret in deployment.secrets {
+								objectName: "\(ks)"
+								secretPath: "\(vaultConfig.path)/data/\(secret.path)"
+								secretKey: "data"
+							}
+						]
+
+						let caObjectsList = list.FlattenN([
+							for dep in deployment.deps
+							if dep.expose.certs != _|_ && len(dep.expose.certs) > 0 {
+								[for certName, cert in dep.expose.certs {
+									objectName: "ca-\(dep.name)-\(certName)"
+									secretPath: "\(cert.pki)/cert/ca"
+									secretKey: "certificate"
+								}]
+							}
+						], 1)
+
+						objects: yaml.Marshal(list.Concat([secretObjects, caObjectsList]))
 					}
-				]
+
+					// Sync env secrets to Kubernetes Secret objects for envFrom
+					if len([for ks, secret in deployment.secrets if secret.type == "env" {secret}]) > 0 {
+						secretObjects: [
+							for ks, secret in deployment.secrets if secret.type == "env" {
+								secretName: "\(k)-\(ks)"
+								type: "Opaque"
+								data: [{
+									objectName: "\(ks)"
+									key: "data"
+								}]
+							}
+						]
+					}
+				}
 			}
 		}
-	}
-},
+	},
 
 for k, deployment in workloads.workloads {
 	"deployment_\(k)": appsv1.#Deployment & {
@@ -95,24 +118,38 @@ for k, deployment in workloads.workloads {
 						image: "\(deployment.container.registry)/\(deployment.container.name):\(deployment.container.tag)"
 						name:  k
 						volumeMounts: list.Concat([
+							// User-defined volumes
 							if len(deployment.volumes) > 0 {
 								[for kv, volume in deployment.volumes {
 									name:      "\(k)-\(kv)"
 									mountPath: volume.mount
 								}]
 							},
+							// ConfigMap mounts
 							if len(deployment.configs) > 0 {
 								[for kc, config in deployment.configs {
 									name:      "\(k)-\(kc)"
 									mountPath: path.Dir(config.mount)
 								}]
 							},
-							if len(deployment.secrets) > 0 {
+							// CSI volume mounts for file secrets
+							if len([for ks, secret in deployment.secrets if secret.type == "file" {secret}]) > 0 {
 								[for ks, secret in deployment.secrets if secret.type == "file" {
-									name:      "\(k)-\(ks)"
+									name:      "\(k)-csi-secrets"
 									mountPath: path.Dir(secret.mount)
+									subPath:   "\(ks)"
+									readOnly:  true
 								}]
-							}])
+							},
+							// CSI volume mounts for dependency CA certificates
+							if _workloadHasDepsWithCerts[k] {
+								[{
+									name:      "\(k)-csi-secrets"
+									mountPath: "/etc/ssl/certs/deps"
+									readOnly:  true
+								}]
+							},
+						])
 						ports: [for port in deployment.expose.ports {
 							containerPort: port.containerPort
 						}]
@@ -169,6 +206,7 @@ for k, deployment in workloads.workloads {
 						}
 						}]
 					volumes: list.Concat([
+						// User-defined volumes (emptyDir, hostPath)
 						[for kv, volume in deployment.volumes {
 							name: "\(k)-\(kv)"
 							if volume.type == "emptyDir" {
@@ -184,18 +222,26 @@ for k, deployment in workloads.workloads {
 								}
 							}
 						}],
+						// ConfigMap volumes
 						[for kc, config in deployment.configs {
 							name: "\(k)-\(kc)"
 							configMap: {
 								name: "\(k)-\(kc)"
 							}
 						}],
-						[for ks, secret in deployment.secrets if secret.type == "file" {
-							name: "\(k)-\(ks)"
-							secret: {
-								secretName: "\(k)-\(ks)"
-							}
-						}],
+						// CSI volume for secrets and dependency CA certs
+						if len(deployment.secrets) > 0 || _workloadHasDepsWithCerts[k] {
+							[{
+								name: "\(k)-csi-secrets"
+								csi: {
+									driver: "secrets-store.csi.k8s.io"
+									readOnly: true
+									volumeAttributes: {
+										secretProviderClass: "\(k)-secrets"
+									}
+								}
+							}]
+						},
 					])
 				}
 			}

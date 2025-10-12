@@ -4,7 +4,6 @@ import (
 	metav1 "cue.dev/x/k8s.io/apimachinery/pkg/apis/meta/v1@v0"
 )
 
-
 // Define Vault secret to be mounted (file)/injected (env var) into the workload
 #Secret:
 {
@@ -26,69 +25,33 @@ import (
 	type: "file"
 }
 
-// Our secrets are stored in Vault and retrieved
-// via [_External Secrets Operator_](external-secrets.io)
-// We are specifying shape of associated CRDs
-
-#ExternalSecret: {
-	apiVersion: "external-secrets.io/v1beta1"
-	kind:       "ExternalSecret"
+// SecretProviderClass defines the schema for Secrets Store CSI Driver
+// Used to retrieve secrets from Vault without storing them in etcd
+#SecretProviderClass: {
+	apiVersion: "secrets-store.csi.x-k8s.io/v1"
+	kind:       "SecretProviderClass"
 	metadata:   metav1.#ObjectMeta
 	spec: {
-		secretStoreRef: {
-			name: string
-			kind: string | *"SecretStore"
+		provider: string | *"vault"
+		parameters?: {
+			vaultAddress?: string
+			vaultNamespace?: string
+			roleName?: string
+			vaultKubernetesMountPath?: string
+			vaultCACertPath?: string
+			vaultCADirectory?: string
+			vaultSkipTLSVerify?: string
+			// YAML string containing array of secret objects to fetch
+			objects?: string
 		}
-		refreshInterval?: string
-		target: {
-			name:           string
-			creationPolicy: string | *"Owner"
-			template?: {
-				type?: string
-				engineVersion?: string
-				data?: [string]: string
-				metadata?: {
-					annotations?: [string]: string
-					labels?: [string]: string
-				}
-			}
-		}
-		data?: [...{
-			secretKey: string
-			remoteRef: {
-				key:       string
-				property?: string
-			}
-		}]
-		dataFrom?: [...{
-			extract?: {
+		// Optional: sync secrets to Kubernetes Secret objects
+		secretObjects?: [...{
+			secretName: string
+			type?: string | *"Opaque"
+			data?: [...{
+				objectName: string
 				key: string
-			}
+			}]
 		}]
-	}
-}
-
-#SecretStore: {
-	apiVersion: "external-secrets.io/v1beta1"
-	kind:       "SecretStore"
-	metadata:   metav1.#ObjectMeta
-	spec: {
-		provider: {
-			vault: {
-				server:  string
-				path:    string
-				version: string | *"v2"
-				auth: {
-					kubernetes?: {
-						mountPath: string
-						role:      string
-					}
-					tokenSecretRef?: {
-						name: string
-						key:  string
-					}
-				}
-			}
-		}
 	}
 }
