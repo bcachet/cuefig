@@ -15,3 +15,6 @@
 !workloads/*.cue
 !backends/
 !backends/*.cue
+
+!.devcontainer/
+!.devcontainer/devcontainer.json
