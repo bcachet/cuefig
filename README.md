@@ -234,19 +234,86 @@ See the example workloads in [workloads/](workloads/):
 - [redis.cue](workloads/redis.cue): Redis with TLS, secrets, config files, and volumes
 - [vote.cue](workloads/vote.cue): Voting app with Redis dependency
 
-## Backend-Specific Behavior
 
-### Kubernetes
+## Kubernetes
 
-- Generates Deployment, ConfigMap, and SecretStore resources
+The Kubernetes backend behaviors:
+- Automatically generates standard manifests (Deployments, ConfigMaps, Services, SecretProviderClass) from your workload definitions
 - ConfigMaps are mounted as volumes
 - Port exposure requires separate Service definitions (not generated)
 - Secrets are synced from Vault via CSI driver
 - Certificates are mounted via CSI driver from Vault PKI
 
-### Docker Compose
+ You can customize or extend these manifests using the `manifests` field (in the `backends` package).
 
-- Ports are mapped to host
-- ConfigMaps are written to `.generated/` and bind-mounted
-- Dependencies use `depends_on`
-- Secrets are not currently handled
+### Adding Custom Manifests
+
+You can add additional Kubernetes resources by defining them in the `manifests` field in [backends/kube.cue](backends/kube.cue):
+
+```cue
+manifests: {
+    // Generated manifests (ConfigMaps, Deployments, etc.)
+    // ...
+
+    // Add a custom Ingress resource
+    "ingress_myapp": networkingv1.#Ingress & {
+        metadata: {
+            name: "myapp-ingress"
+            annotations: {
+                "nginx.ingress.kubernetes.io/rewrite-target": "/"
+            }
+        }
+        spec: {
+            rules: [{
+                host: "myapp.example.com"
+                http: paths: [{
+                    path: "/"
+                    pathType: "Prefix"
+                    backend: service: {
+                        name: "myapp"
+                        port: number: 80
+                    }
+                }]
+            }]
+        }
+    }
+}
+```
+
+### Replacing Generated Manifests
+
+You can override any generated manifest by using the same key. For example, to customize the Service for a workload:
+
+```cue
+manifests: {
+    // This replaces the auto-generated LoadBalancer service for "myapp"
+    "service_myapp": corev1.#Service & {
+        metadata: {
+            name: "myapp"
+            labels: app: "myapp"
+            annotations: {
+                "service.beta.kubernetes.io/aws-load-balancer-type": "nlb"
+            }
+        }
+        spec: {
+            type: "ClusterIP"  // Change from LoadBalancer to ClusterIP
+            selector: app: "myapp"
+            ports: [{
+                name:       "http"
+                port:       80
+                targetPort: 8080
+            }]
+        }
+    }
+}
+```
+
+### Manifest Key Conventions
+
+Generated manifests follow these naming conventions:
+- `config-map_<workload>_<configname>`: ConfigMap resources
+- `secret-provider-class_<workload>`: SecretProviderClass resources
+- `deployment_<workload>`: Deployment resources
+- `service_<workload>`: Service resources
+
+Use these keys to replace generated manifests or create new ones with custom keys.
