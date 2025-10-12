@@ -3,6 +3,7 @@ package backends
 import (
 	"path"
 	"list"
+	"strings"
 	"encoding/yaml"
 	appsv1 "cue.dev/x/k8s.io/api/apps/v1@v0"
 	corev1 "cue.dev/x/k8s.io/api/core/v1@v0"
@@ -33,6 +34,17 @@ _workloadHasDepsWithCerts: {
 	}
 }
 
+// Helper to check if workload has its own certs
+_workloadHasOwnCerts: {
+	for k, deployment in workloads.workloads {
+		"\(k)": len([if deployment.expose.certs != _|_ {
+			if len(deployment.expose.certs) > 0 {
+				true
+			}
+		}]) > 0
+	}
+}
+
 manifests: {
 
 	// Generate ConfigMaps for workload configs
@@ -51,8 +63,9 @@ manifests: {
 	for k, deployment in workloads.workloads {
 		let hasSecrets = len(deployment.secrets) > 0
 		let hasDepsWithCerts = _workloadHasDepsWithCerts[k]
+		let hasOwnCerts = _workloadHasOwnCerts[k]
 
-		if hasSecrets || hasDepsWithCerts {
+		if hasSecrets || hasDepsWithCerts || hasOwnCerts {
 			"secret-provider-class_\(k)": schemas.#SecretProviderClass & {
 				metadata: name: "\(k)-secrets"
 				spec: {
@@ -71,18 +84,49 @@ manifests: {
 							}
 						]
 
-						let caObjectsList = list.FlattenN([
+						// Workload's own certificates (issued from PKI)
+						// Note: CSI driver issues cert once and extracts different keys
+						let ownCertObjects = list.FlattenN([
+							if deployment.expose.certs != _|_ {
+								if len(deployment.expose.certs) > 0 {
+									[for certName, cert in deployment.expose.certs
+									for part in [
+										{key: "certificate", name: "cert"},
+										{key: "private_key", name: "key"},
+										{key: "issuing_ca", name: "ca"},
+										{key: "ca_chain", name: "ca-chain"}
+									] {
+										objectName: "\(part.name)-\(certName)"
+										secretPath: "\(cert.pki)/issue/\(k)-role"
+										secretKey: part.key
+										method: "PUT"
+										secretArgs: {
+											common_name: cert.commonName
+											if cert.altNames != _|_ {
+												alt_names: strings.Join(cert.altNames, ",")
+											}
+											if cert.ttl != _|_ {
+												ttl: cert.ttl
+											}
+										}
+									}]
+								}
+							}
+						], 2)
+
+						// Dependency CA certificates (read from PKI)
+						let depCaObjects = list.FlattenN([
 							for dep in deployment.deps
 							if dep.expose.certs != _|_ && len(dep.expose.certs) > 0 {
 								[for certName, cert in dep.expose.certs {
-									objectName: "ca-\(dep.name)-\(certName)"
+									objectName: "dep-ca-\(dep.name)-\(certName)"
 									secretPath: "\(cert.pki)/cert/ca"
 									secretKey: "certificate"
 								}]
 							}
 						], 1)
 
-						objects: yaml.Marshal(list.Concat([secretObjects, caObjectsList]))
+						objects: yaml.Marshal(list.Concat([secretObjects, ownCertObjects, depCaObjects]))
 					}
 
 					// Sync env secrets to Kubernetes Secret objects for envFrom
@@ -138,6 +182,14 @@ for k, deployment in workloads.workloads {
 									name:      "\(k)-csi-secrets"
 									mountPath: path.Dir(secret.mount)
 									subPath:   "\(ks)"
+									readOnly:  true
+								}]
+							},
+							// CSI volume mounts for workload's own certificates
+							if _workloadHasOwnCerts[k] {
+								[{
+									name:      "\(k)-csi-secrets"
+									mountPath: "/etc/certs"
 									readOnly:  true
 								}]
 							},
@@ -229,8 +281,8 @@ for k, deployment in workloads.workloads {
 								name: "\(k)-\(kc)"
 							}
 						}],
-						// CSI volume for secrets and dependency CA certs
-						if len(deployment.secrets) > 0 || _workloadHasDepsWithCerts[k] {
+						// CSI volume for secrets, own certs, and dependency CA certs
+						if len(deployment.secrets) > 0 || _workloadHasDepsWithCerts[k] || _workloadHasOwnCerts[k] {
 							[{
 								name: "\(k)-csi-secrets"
 								csi: {
