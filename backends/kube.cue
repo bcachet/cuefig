@@ -311,10 +311,10 @@ for k, deployment in workloads.workloads if len(deployment.expose.ports) > 0 {
 		spec: {
 			type: "LoadBalancer"
 			selector: app: k
-			ports: [for portName, portDef in deployment.expose.ports {
+			ports: [for portDef in deployment.expose.ports {
 				let exposedPort = portDef.exposedPort | portDef.containerPort
 				{
-					name:       portName
+					name:       "\(k)_\(portDef.containerPort)"
 					port:       exposedPort
 					targetPort: portDef.containerPort
 				}

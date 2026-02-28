@@ -13,7 +13,7 @@ workloads: schemas.#Workloads & {
 		}
 
 		expose: {
-			ports: "6379": {}
+			ports: [schemas.#Port & {containerPort: 6379}]
 			certs: "tls": {
 				pki: "pki"
 				commonName: "redis.default.svc.cluster.local"
