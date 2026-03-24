@@ -1,17 +1,25 @@
 package tools
 
 import (
+	"list"
 	"encoding/yaml"
 	"tool/cli"
-    "github.com/bcachet/cuefig/backends"
+	"github.com/bcachet/cuefig/backends"
 )
 
 command: kube: {
 	print: cli.Print & {
 		text: yaml.Marshal({
-			kind: "List"
+			kind:       "List"
 			apiVersion: "v1"
-			items: [for _, manifest in backends.manifests {manifest}]
+			items: list.FlattenN([for _, wl in backends.manifests {
+				list.Concat([
+					[for _, m in wl.deployments {m}],
+					[for _, m in wl.configmaps {m}],
+					[for _, m in wl.secrets {m}],
+					[for _, m in wl.services {m}],
+				])
+			}], 1)
 		})
 	}
 }
